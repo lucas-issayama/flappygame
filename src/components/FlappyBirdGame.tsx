@@ -38,7 +38,7 @@ const PIPE_WIDTH = 60
 const PIPE_GAP = 200
 const GRAVITY = 0.3
 const JUMP_FORCE = -7
-const PIPE_SPEED = 1
+const PIPE_SPEED = 2
 
 export default function FlappyBirdGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
