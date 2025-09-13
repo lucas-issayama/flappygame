@@ -17,9 +17,19 @@ interface Pipe {
   passed: boolean
 }
 
+interface Dolphin {
+  x: number
+  y: number
+  jumpPhase: number
+  direction: number
+  visible: boolean
+  startX: number
+}
+
 interface GameState {
   bird: Bird
   pipes: Pipe[]
+  dolphins: Dolphin[]
   score: number
   gameStarted: boolean
   gameOver: boolean
@@ -29,6 +39,7 @@ interface GameState {
     y: number
     frame: number
   }
+  frameCount: number
 }
 
 const BASE_WIDTH = 400
@@ -43,6 +54,7 @@ const PIPE_SPEED = 1.5
 export default function FlappyBirdGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number>()
+  const volleyballImageRef = useRef<HTMLImageElement | null>(null)
 
   const [canvasSize, setCanvasSize] = useState({ width: BASE_WIDTH, height: BASE_HEIGHT })
   const [scale, setScale] = useState(1)
@@ -76,6 +88,14 @@ export default function FlappyBirdGame() {
     }
   }, [])
 
+  // Load volleyball image
+  useEffect(() => {
+    const img = new Image()
+    img.src = '/volleyball.png'
+    img.onload = () => {
+      volleyballImageRef.current = img
+    }
+  }, [])
 
   const [gameState, setGameState] = useState<GameState>({
     bird: {
@@ -85,6 +105,7 @@ export default function FlappyBirdGame() {
       radius: BIRD_SIZE / 2
     },
     pipes: [],
+    dolphins: [],
     score: 0,
     gameStarted: false,
     gameOver: false,
@@ -93,7 +114,8 @@ export default function FlappyBirdGame() {
       x: 0,
       y: 0,
       frame: 0
-    }
+    },
+    frameCount: 0
   })
 
   const resetGame = useCallback(() => {
@@ -105,6 +127,7 @@ export default function FlappyBirdGame() {
         radius: BIRD_SIZE / 2
       },
       pipes: [],
+      dolphins: [],
       score: 0,
       gameStarted: false,
       gameOver: false,
@@ -113,7 +136,8 @@ export default function FlappyBirdGame() {
         x: 0,
         y: 0,
         frame: 0
-      }
+      },
+      frameCount: 0
     })
   }, [])
 
@@ -169,7 +193,9 @@ export default function FlappyBirdGame() {
 
       const newBird = { ...prev.bird }
       let newPipes = [...prev.pipes]
+      let newDolphins = [...prev.dolphins]
       let newScore = prev.score
+      let newFrameCount = prev.frameCount + 1
 
       // Only apply physics when game is started
       if (prev.gameStarted) {
@@ -207,6 +233,38 @@ export default function FlappyBirdGame() {
             passed: false
           })
         }
+      }
+
+      // Update dolphins
+      newDolphins = newDolphins.map(dolphin => {
+        if (!dolphin.visible) return dolphin
+
+        dolphin.jumpPhase += 0.05
+        dolphin.x += dolphin.direction * 1.5
+
+        // Calculate arc trajectory
+        const progress = dolphin.jumpPhase
+        if (progress <= 1) {
+          dolphin.y = BASE_HEIGHT * 0.7 - Math.sin(progress * Math.PI) * 60
+        } else {
+          dolphin.visible = false
+        }
+
+        return dolphin
+      }).filter(dolphin => dolphin.visible && dolphin.x > -50 && dolphin.x < BASE_WIDTH + 50)
+
+      // Spawn new dolphins more frequently (every 180 frames = 3 seconds at 60fps)
+      if (newFrameCount % 180 === 0 && Math.random() < 0.7 && newDolphins.length < 2) {
+        const direction = Math.random() < 0.5 ? 1 : -1
+        const startX = direction === 1 ? -30 : BASE_WIDTH + 30
+        newDolphins.push({
+          x: startX,
+          y: BASE_HEIGHT * 0.7,
+          jumpPhase: 0,
+          direction,
+          visible: true,
+          startX
+        })
       }
 
       // Check collision
@@ -254,9 +312,11 @@ export default function FlappyBirdGame() {
         ...prev,
         bird: newBird,
         pipes: newPipes,
+        dolphins: newDolphins,
         score: newScore,
         gameOver: collision,
-        explosion: newExplosion
+        explosion: newExplosion,
+        frameCount: newFrameCount
       }
     })
   }
@@ -271,15 +331,57 @@ export default function FlappyBirdGame() {
     setGameState(currentState => {
       ctx.clearRect(0, 0, BASE_WIDTH, BASE_HEIGHT)
 
-      // Beach sky gradient
-      const skyGradient = ctx.createLinearGradient(0, 0, 0, BASE_HEIGHT * 0.7)
+      // Beach sky gradient (50%)
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, BASE_HEIGHT * 0.5)
       skyGradient.addColorStop(0, '#87CEEB')
       skyGradient.addColorStop(0.5, '#ADD8E6')
       skyGradient.addColorStop(1, '#F0E68C')
       ctx.fillStyle = skyGradient
-      ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT * 0.7)
+      ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT * 0.5)
 
-      // Beach sand
+      // Sea background (20% - reduced size)
+      const seaGradient = ctx.createLinearGradient(0, BASE_HEIGHT * 0.5, 0, BASE_HEIGHT * 0.7)
+      seaGradient.addColorStop(0, '#20B2AA')
+      seaGradient.addColorStop(0.5, '#008B8B')
+      seaGradient.addColorStop(1, '#006666')
+      ctx.fillStyle = seaGradient
+      ctx.fillRect(0, BASE_HEIGHT * 0.5, BASE_WIDTH, BASE_HEIGHT * 0.2)
+
+      // Animated sea waves
+      const waveHeight = 6
+      const waveLength = BASE_WIDTH / 3
+      const waveSpeed = currentState.frameCount * 0.05
+
+      ctx.strokeStyle = '#FFFFFF'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+
+      for (let x = 0; x <= BASE_WIDTH; x += 2) {
+        const y = BASE_HEIGHT * 0.7 + Math.sin((x / waveLength + waveSpeed) * Math.PI * 2) * waveHeight
+        if (x === 0) {
+          ctx.moveTo(x, y)
+        } else {
+          ctx.lineTo(x, y)
+        }
+      }
+      ctx.stroke()
+
+      // Secondary smaller waves
+      ctx.strokeStyle = '#E0FFFF'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+
+      for (let x = 0; x <= BASE_WIDTH; x += 2) {
+        const y = BASE_HEIGHT * 0.7 + Math.sin((x / waveLength + waveSpeed * 1.3) * Math.PI * 2) * waveHeight * 0.4 + 3
+        if (x === 0) {
+          ctx.moveTo(x, y)
+        } else {
+          ctx.lineTo(x, y)
+        }
+      }
+      ctx.stroke()
+
+      // Beach sand (30%)
       ctx.fillStyle = '#F4A460'
       ctx.fillRect(0, BASE_HEIGHT * 0.7, BASE_WIDTH, BASE_HEIGHT * 0.3)
 
@@ -292,6 +394,60 @@ export default function FlappyBirdGame() {
         ctx.arc(x, y, 1, 0, Math.PI * 2)
         ctx.fill()
       }
+
+      // Draw dolphins
+      currentState.dolphins.forEach(dolphin => {
+        if (!dolphin.visible) return
+
+        const centerX = dolphin.x
+        const centerY = dolphin.y
+        const size = 16
+
+        // Dolphin body (main ellipse)
+        ctx.fillStyle = '#C0C0C0'
+        ctx.beginPath()
+        ctx.ellipse(centerX, centerY, size, size * 0.6, 0, 0, Math.PI * 2)
+        ctx.fill()
+
+        // Add body outline for visibility
+        ctx.strokeStyle = '#808080'
+        ctx.lineWidth = 2
+        ctx.stroke()
+
+        // Dolphin snout
+        const snoutDirection = dolphin.direction
+        ctx.fillStyle = '#C0C0C0'
+        ctx.beginPath()
+        ctx.ellipse(centerX + snoutDirection * size * 0.7, centerY - size * 0.1, size * 0.4, size * 0.3, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#808080'
+        ctx.lineWidth = 2
+        ctx.stroke()
+
+        // Dolphin tail
+        ctx.fillStyle = '#C0C0C0'
+        ctx.beginPath()
+        ctx.ellipse(centerX - snoutDirection * size * 0.8, centerY + size * 0.2, size * 0.5, size * 0.8, Math.PI * 0.3 * snoutDirection, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#808080'
+        ctx.lineWidth = 2
+        ctx.stroke()
+
+        // Dolphin dorsal fin
+        ctx.fillStyle = '#A9A9A9'
+        ctx.beginPath()
+        ctx.ellipse(centerX, centerY - size * 0.6, size * 0.3, size * 0.4, 0, 0, Math.PI)
+        ctx.fill()
+        ctx.strokeStyle = '#808080'
+        ctx.lineWidth = 2
+        ctx.stroke()
+
+        // Simple eye
+        ctx.fillStyle = '#000000'
+        ctx.beginPath()
+        ctx.arc(centerX + snoutDirection * size * 0.2, centerY - size * 0.2, 3, 0, Math.PI * 2)
+        ctx.fill()
+      })
 
       currentState.pipes.forEach(pipe => {
         // Draw cactus top part
@@ -346,56 +502,34 @@ export default function FlappyBirdGame() {
         const centerX = currentState.bird.x
         const centerY = currentState.bird.y
         const radius = currentState.bird.radius
+        const diameter = radius * 2
 
-        // Create volleyball segments (6 segments total)
-        for (let i = 0; i < 6; i++) {
-          const startAngle = (i * Math.PI) / 3
-          const endAngle = ((i + 1) * Math.PI) / 3
-
+        // Use volleyball image if loaded, otherwise fallback to simple circle
+        if (volleyballImageRef.current) {
+          ctx.drawImage(
+            volleyballImageRef.current,
+            centerX - radius,
+            centerY - radius,
+            diameter,
+            diameter
+          )
+        } else {
+          // Fallback: simple volleyball circle
+          ctx.fillStyle = '#FFFFFF'
           ctx.beginPath()
-          ctx.moveTo(centerX, centerY)
-          ctx.arc(centerX, centerY, radius, startAngle, endAngle)
-          ctx.closePath()
-
-          // Alternate between yellow and blue segments
-          if (i % 2 === 0) {
-            ctx.fillStyle = '#FFD700' // Gold/Yellow
-          } else {
-            ctx.fillStyle = '#1E90FF' // Dodger Blue
-          }
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
           ctx.fill()
 
-          // Add segment border
-          ctx.strokeStyle = '#333333'
-          ctx.lineWidth = 1
-          ctx.stroke()
-        }
-
-        // Add the characteristic volleyball lines
-        ctx.strokeStyle = '#333333'
-        ctx.lineWidth = 2
-
-        // Three curved lines dividing the segments
-        for (let i = 0; i < 3; i++) {
-          const angle = (i * Math.PI) / 3
+          // Add simple volleyball lines
+          ctx.strokeStyle = '#FF6B6B'
+          ctx.lineWidth = 2
           ctx.beginPath()
-          ctx.moveTo(
-            centerX + Math.cos(angle) * radius,
-            centerY + Math.sin(angle) * radius
-          )
-          ctx.lineTo(
-            centerX - Math.cos(angle) * radius,
-            centerY - Math.sin(angle) * radius
-          )
+          ctx.moveTo(centerX - radius, centerY)
+          ctx.lineTo(centerX + radius, centerY)
+          ctx.moveTo(centerX, centerY - radius)
+          ctx.lineTo(centerX, centerY + radius)
           ctx.stroke()
         }
-
-        // Outer border
-        ctx.strokeStyle = '#333333'
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
-        ctx.stroke()
       }
 
       // Draw explosion effect
