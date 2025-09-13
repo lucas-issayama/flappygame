@@ -35,10 +35,10 @@ const BASE_WIDTH = 400
 const BASE_HEIGHT = 600
 const BIRD_SIZE = 20
 const PIPE_WIDTH = 60
-const PIPE_GAP = 200
-const GRAVITY = 0.3
-const JUMP_FORCE = -7
-const PIPE_SPEED = 2
+const PIPE_GAP = 250
+const GRAVITY = 0.25
+const JUMP_FORCE = -6
+const PIPE_SPEED = 1.5
 
 export default function FlappyBirdGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -135,7 +135,7 @@ export default function FlappyBirdGame() {
   }, [gameState.gameStarted, gameState.gameOver, resetGame])
 
   const createPipe = useCallback((x: number): Pipe => {
-    const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 100) + 50
+    const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 150) + 75
     return {
       x,
       width: PIPE_WIDTH,
@@ -189,7 +189,7 @@ export default function FlappyBirdGame() {
         newPipes = newPipes.filter(pipe => pipe.x + pipe.width > 0)
 
         if (newPipes.length === 0) {
-          const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 100) + 50
+          const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 150) + 75
           newPipes.push({
             x: BASE_WIDTH + 150,
             width: PIPE_WIDTH,
@@ -197,8 +197,8 @@ export default function FlappyBirdGame() {
             gapHeight: PIPE_GAP,
             passed: false
           })
-        } else if (newPipes[newPipes.length - 1].x < BASE_WIDTH - 200) {
-          const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 100) + 50
+        } else if (newPipes[newPipes.length - 1].x < BASE_WIDTH - 250) {
+          const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 150) + 75
           newPipes.push({
             x: BASE_WIDTH,
             width: PIPE_WIDTH,
