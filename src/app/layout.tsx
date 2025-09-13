@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Flappy Bird Game',
-  description: 'A mobile-friendly Flappy Bird game built with Next.js',
+  title: 'Beach Volleyball Game',
+  description: 'A mobile-friendly beach volleyball game - bounce through the desert cactus!',
 }
 
 export default function RootLayout({

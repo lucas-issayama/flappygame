@@ -23,6 +23,12 @@ interface GameState {
   score: number
   gameStarted: boolean
   gameOver: boolean
+  explosion: {
+    active: boolean
+    x: number
+    y: number
+    frame: number
+  }
 }
 
 const CANVAS_WIDTH = 400
@@ -49,7 +55,13 @@ export default function FlappyBirdGame() {
     pipes: [],
     score: 0,
     gameStarted: false,
-    gameOver: false
+    gameOver: false,
+    explosion: {
+      active: false,
+      x: 0,
+      y: 0,
+      frame: 0
+    }
   })
 
   const resetGame = useCallback(() => {
@@ -63,7 +75,13 @@ export default function FlappyBirdGame() {
       pipes: [],
       score: 0,
       gameStarted: false,
-      gameOver: false
+      gameOver: false,
+      explosion: {
+        active: false,
+        x: 0,
+        y: 0,
+        frame: 0
+      }
     })
   }, [])
 
@@ -161,9 +179,17 @@ export default function FlappyBirdGame() {
 
       // Check collision
       let collision = false
+      let newExplosion = { ...prev.explosion }
+
       if (prev.gameStarted) {
         if (newBird.y - newBird.radius <= 0 || newBird.y + newBird.radius >= CANVAS_HEIGHT) {
           collision = true
+          newExplosion = {
+            active: true,
+            x: newBird.x,
+            y: newBird.y,
+            frame: 0
+          }
         }
 
         for (const pipe of newPipes) {
@@ -173,8 +199,22 @@ export default function FlappyBirdGame() {
             (newBird.y - newBird.radius < pipe.gapY || newBird.y + newBird.radius > pipe.gapY + pipe.gapHeight)
           ) {
             collision = true
+            newExplosion = {
+              active: true,
+              x: newBird.x,
+              y: newBird.y,
+              frame: 0
+            }
             break
           }
+        }
+      }
+
+      // Update explosion animation
+      if (newExplosion.active) {
+        newExplosion.frame += 1
+        if (newExplosion.frame > 30) { // Animation lasts 30 frames
+          newExplosion.active = false
         }
       }
 
@@ -183,7 +223,8 @@ export default function FlappyBirdGame() {
         bird: newBird,
         pipes: newPipes,
         score: newScore,
-        gameOver: collision
+        gameOver: collision,
+        explosion: newExplosion
       }
     })
   }
@@ -198,31 +239,171 @@ export default function FlappyBirdGame() {
     setGameState(currentState => {
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
 
-      ctx.fillStyle = '#87CEEB'
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT * 0.8)
+      // Beach sky gradient
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT * 0.7)
+      skyGradient.addColorStop(0, '#87CEEB')
+      skyGradient.addColorStop(0.5, '#ADD8E6')
+      skyGradient.addColorStop(1, '#F0E68C')
+      ctx.fillStyle = skyGradient
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT * 0.7)
 
-      ctx.fillStyle = '#90EE90'
-      ctx.fillRect(0, CANVAS_HEIGHT * 0.8, CANVAS_WIDTH, CANVAS_HEIGHT * 0.2)
+      // Beach sand
+      ctx.fillStyle = '#F4A460'
+      ctx.fillRect(0, CANVAS_HEIGHT * 0.7, CANVAS_WIDTH, CANVAS_HEIGHT * 0.3)
+
+      // Add some texture to sand with dots
+      ctx.fillStyle = '#DEB887'
+      for (let i = 0; i < 50; i++) {
+        const x = Math.random() * CANVAS_WIDTH
+        const y = CANVAS_HEIGHT * 0.7 + Math.random() * CANVAS_HEIGHT * 0.3
+        ctx.beginPath()
+        ctx.arc(x, y, 1, 0, Math.PI * 2)
+        ctx.fill()
+      }
 
       currentState.pipes.forEach(pipe => {
+        // Draw cactus top part
         ctx.fillStyle = '#228B22'
-        ctx.fillRect(pipe.x, 0, pipe.width, pipe.gapY)
-        ctx.fillRect(pipe.x, pipe.gapY + pipe.gapHeight, pipe.width, CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight)
+        ctx.fillRect(pipe.x + pipe.width * 0.2, 0, pipe.width * 0.6, pipe.gapY)
 
+        // Cactus arms (top)
+        if (pipe.gapY > 100) {
+          ctx.fillRect(pipe.x, pipe.gapY * 0.3, pipe.width * 0.3, pipe.width * 0.2)
+          ctx.fillRect(pipe.x + pipe.width * 0.7, pipe.gapY * 0.6, pipe.width * 0.3, pipe.width * 0.2)
+        }
+
+        // Draw cactus bottom part
+        ctx.fillRect(pipe.x + pipe.width * 0.2, pipe.gapY + pipe.gapHeight, pipe.width * 0.6, CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight)
+
+        // Cactus arms (bottom)
+        if (CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight > 100) {
+          const bottomHeight = CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight
+          ctx.fillRect(pipe.x, pipe.gapY + pipe.gapHeight + bottomHeight * 0.2, pipe.width * 0.3, pipe.width * 0.2)
+          ctx.fillRect(pipe.x + pipe.width * 0.7, pipe.gapY + pipe.gapHeight + bottomHeight * 0.5, pipe.width * 0.3, pipe.width * 0.2)
+        }
+
+        // Add cactus spines
         ctx.strokeStyle = '#006400'
-        ctx.lineWidth = 3
-        ctx.strokeRect(pipe.x, 0, pipe.width, pipe.gapY)
-        ctx.strokeRect(pipe.x, pipe.gapY + pipe.gapHeight, pipe.width, CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight)
+        ctx.lineWidth = 1
+
+        // Vertical spines on main body
+        for (let i = 0; i < 3; i++) {
+          const spineX = pipe.x + pipe.width * 0.3 + i * pipe.width * 0.15
+          // Top cactus spines
+          ctx.beginPath()
+          ctx.moveTo(spineX, 10)
+          ctx.lineTo(spineX, pipe.gapY - 10)
+          ctx.stroke()
+
+          // Bottom cactus spines
+          ctx.beginPath()
+          ctx.moveTo(spineX, pipe.gapY + pipe.gapHeight + 10)
+          ctx.lineTo(spineX, CANVAS_HEIGHT - 10)
+          ctx.stroke()
+        }
+
+        // Cactus outline
+        ctx.strokeStyle = '#006400'
+        ctx.lineWidth = 2
+        ctx.strokeRect(pipe.x + pipe.width * 0.2, 0, pipe.width * 0.6, pipe.gapY)
+        ctx.strokeRect(pipe.x + pipe.width * 0.2, pipe.gapY + pipe.gapHeight, pipe.width * 0.6, CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight)
       })
 
-      ctx.fillStyle = '#FFD700'
-      ctx.beginPath()
-      ctx.arc(currentState.bird.x, currentState.bird.y, currentState.bird.radius, 0, Math.PI * 2)
-      ctx.fill()
+      // Draw volleyball - only if not exploded
+      if (!currentState.explosion.active || !currentState.gameOver) {
+        const centerX = currentState.bird.x
+        const centerY = currentState.bird.y
+        const radius = currentState.bird.radius
 
-      ctx.strokeStyle = '#FFA500'
-      ctx.lineWidth = 2
-      ctx.stroke()
+        // Create volleyball segments (6 segments total)
+        for (let i = 0; i < 6; i++) {
+          const startAngle = (i * Math.PI) / 3
+          const endAngle = ((i + 1) * Math.PI) / 3
+
+          ctx.beginPath()
+          ctx.moveTo(centerX, centerY)
+          ctx.arc(centerX, centerY, radius, startAngle, endAngle)
+          ctx.closePath()
+
+          // Alternate between yellow and blue segments
+          if (i % 2 === 0) {
+            ctx.fillStyle = '#FFD700' // Gold/Yellow
+          } else {
+            ctx.fillStyle = '#1E90FF' // Dodger Blue
+          }
+          ctx.fill()
+
+          // Add segment border
+          ctx.strokeStyle = '#333333'
+          ctx.lineWidth = 1
+          ctx.stroke()
+        }
+
+        // Add the characteristic volleyball lines
+        ctx.strokeStyle = '#333333'
+        ctx.lineWidth = 2
+
+        // Three curved lines dividing the segments
+        for (let i = 0; i < 3; i++) {
+          const angle = (i * Math.PI) / 3
+          ctx.beginPath()
+          ctx.moveTo(
+            centerX + Math.cos(angle) * radius,
+            centerY + Math.sin(angle) * radius
+          )
+          ctx.lineTo(
+            centerX - Math.cos(angle) * radius,
+            centerY - Math.sin(angle) * radius
+          )
+          ctx.stroke()
+        }
+
+        // Outer border
+        ctx.strokeStyle = '#333333'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+
+      // Draw explosion effect
+      if (currentState.explosion.active) {
+        const explosionSize = currentState.explosion.frame * 3
+        const centerX = currentState.explosion.x
+        const centerY = currentState.explosion.y
+
+        // Draw explosion particles
+        ctx.fillStyle = '#FF4500' // Orange-red
+        for (let i = 0; i < 8; i++) {
+          const angle = (i * Math.PI * 2) / 8
+          const distance = explosionSize
+          const x = centerX + Math.cos(angle) * distance
+          const y = centerY + Math.sin(angle) * distance
+
+          ctx.beginPath()
+          ctx.arc(x, y, Math.max(1, 8 - currentState.explosion.frame * 0.3), 0, Math.PI * 2)
+          ctx.fill()
+        }
+
+        // Draw central explosion
+        ctx.fillStyle = '#FFD700' // Yellow
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, Math.max(1, explosionSize * 0.5), 0, Math.PI * 2)
+        ctx.fill()
+
+        // Draw explosion sparks
+        ctx.fillStyle = '#FFFFFF' // White sparks
+        for (let i = 0; i < 12; i++) {
+          const angle = (i * Math.PI * 2) / 12
+          const distance = explosionSize * 1.5
+          const x = centerX + Math.cos(angle) * distance
+          const y = centerY + Math.sin(angle) * distance
+
+          ctx.beginPath()
+          ctx.arc(x, y, 2, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
 
       ctx.fillStyle = '#000'
       ctx.font = 'bold 24px Arial'
@@ -235,10 +416,10 @@ export default function FlappyBirdGame() {
 
         ctx.fillStyle = '#FFF'
         ctx.font = 'bold 32px Arial'
-        ctx.fillText('Flappy Bird', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50)
+        ctx.fillText('Beach Volleyball', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50)
 
         ctx.font = '18px Arial'
-        ctx.fillText('Tap to Start', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20)
+        ctx.fillText('Tap to Bounce!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20)
 
         ctx.font = '14px Arial'
         ctx.fillText('Desktop: Space or ↑ Arrow | Mobile: Tap', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60)
@@ -254,7 +435,7 @@ export default function FlappyBirdGame() {
 
         ctx.font = '18px Arial'
         ctx.fillText(`Final Score: ${currentState.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
-        ctx.fillText('Tap to Restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30)
+        ctx.fillText('Tap to Play Again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30)
       }
 
       return currentState
