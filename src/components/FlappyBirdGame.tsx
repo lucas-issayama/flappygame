@@ -31,8 +31,8 @@ interface GameState {
   }
 }
 
-const CANVAS_WIDTH = 400
-const CANVAS_HEIGHT = 600
+const BASE_WIDTH = 400
+const BASE_HEIGHT = 600
 const BIRD_SIZE = 20
 const PIPE_WIDTH = 60
 const PIPE_GAP = 150
@@ -44,11 +44,43 @@ export default function FlappyBirdGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number>()
 
+  const [canvasSize, setCanvasSize] = useState({ width: BASE_WIDTH, height: BASE_HEIGHT })
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      if (typeof window !== 'undefined') {
+        const screenWidth = window.innerWidth
+        const screenHeight = window.innerHeight
+
+        // Calculate scale to fit screen while maintaining aspect ratio
+        const scaleX = (screenWidth - 40) / BASE_WIDTH  // 40px padding
+        const scaleY = (screenHeight - 100) / BASE_HEIGHT  // 100px for UI elements
+        const newScale = Math.min(scaleX, scaleY, 1.2) // Max scale of 1.2
+
+        const width = BASE_WIDTH * newScale
+        const height = BASE_HEIGHT * newScale
+
+        setCanvasSize({ width, height })
+        setScale(newScale)
+      }
+    }
+
+    updateCanvasSize()
+    window.addEventListener('resize', updateCanvasSize)
+    window.addEventListener('orientationchange', updateCanvasSize)
+
+    return () => {
+      window.removeEventListener('resize', updateCanvasSize)
+      window.removeEventListener('orientationchange', updateCanvasSize)
+    }
+  }, [])
+
 
   const [gameState, setGameState] = useState<GameState>({
     bird: {
-      x: CANVAS_WIDTH / 4,
-      y: CANVAS_HEIGHT / 2,
+      x: BASE_WIDTH / 4,
+      y: BASE_HEIGHT / 2,
       velocity: 0,
       radius: BIRD_SIZE / 2
     },
@@ -67,8 +99,8 @@ export default function FlappyBirdGame() {
   const resetGame = useCallback(() => {
     setGameState({
       bird: {
-        x: CANVAS_WIDTH / 4,
-        y: CANVAS_HEIGHT / 2,
+        x: BASE_WIDTH / 4,
+        y: BASE_HEIGHT / 2,
         velocity: 0,
         radius: BIRD_SIZE / 2
       },
@@ -103,7 +135,7 @@ export default function FlappyBirdGame() {
   }, [gameState.gameStarted, gameState.gameOver, resetGame])
 
   const createPipe = useCallback((x: number): Pipe => {
-    const gapY = Math.random() * (CANVAS_HEIGHT - PIPE_GAP - 100) + 50
+    const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 100) + 50
     return {
       x,
       width: PIPE_WIDTH,
@@ -114,7 +146,7 @@ export default function FlappyBirdGame() {
   }, [])
 
   const checkCollision = useCallback((bird: Bird, pipes: Pipe[]): boolean => {
-    if (bird.y - bird.radius <= 0 || bird.y + bird.radius >= CANVAS_HEIGHT) {
+    if (bird.y - bird.radius <= 0 || bird.y + bird.radius >= BASE_HEIGHT) {
       return true
     }
 
@@ -157,18 +189,18 @@ export default function FlappyBirdGame() {
         newPipes = newPipes.filter(pipe => pipe.x + pipe.width > 0)
 
         if (newPipes.length === 0) {
-          const gapY = Math.random() * (CANVAS_HEIGHT - PIPE_GAP - 100) + 50
+          const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 100) + 50
           newPipes.push({
-            x: CANVAS_WIDTH + 150,
+            x: BASE_WIDTH + 150,
             width: PIPE_WIDTH,
             gapY,
             gapHeight: PIPE_GAP,
             passed: false
           })
-        } else if (newPipes[newPipes.length - 1].x < CANVAS_WIDTH - 200) {
-          const gapY = Math.random() * (CANVAS_HEIGHT - PIPE_GAP - 100) + 50
+        } else if (newPipes[newPipes.length - 1].x < BASE_WIDTH - 200) {
+          const gapY = Math.random() * (BASE_HEIGHT - PIPE_GAP - 100) + 50
           newPipes.push({
-            x: CANVAS_WIDTH,
+            x: BASE_WIDTH,
             width: PIPE_WIDTH,
             gapY,
             gapHeight: PIPE_GAP,
@@ -182,7 +214,7 @@ export default function FlappyBirdGame() {
       let newExplosion = { ...prev.explosion }
 
       if (prev.gameStarted) {
-        if (newBird.y - newBird.radius <= 0 || newBird.y + newBird.radius >= CANVAS_HEIGHT) {
+        if (newBird.y - newBird.radius <= 0 || newBird.y + newBird.radius >= BASE_HEIGHT) {
           collision = true
           newExplosion = {
             active: true,
@@ -237,25 +269,25 @@ export default function FlappyBirdGame() {
     if (!ctx) return
 
     setGameState(currentState => {
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+      ctx.clearRect(0, 0, BASE_WIDTH, BASE_HEIGHT)
 
       // Beach sky gradient
-      const skyGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT * 0.7)
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, BASE_HEIGHT * 0.7)
       skyGradient.addColorStop(0, '#87CEEB')
       skyGradient.addColorStop(0.5, '#ADD8E6')
       skyGradient.addColorStop(1, '#F0E68C')
       ctx.fillStyle = skyGradient
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT * 0.7)
+      ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT * 0.7)
 
       // Beach sand
       ctx.fillStyle = '#F4A460'
-      ctx.fillRect(0, CANVAS_HEIGHT * 0.7, CANVAS_WIDTH, CANVAS_HEIGHT * 0.3)
+      ctx.fillRect(0, BASE_HEIGHT * 0.7, BASE_WIDTH, BASE_HEIGHT * 0.3)
 
       // Add some texture to sand with dots
       ctx.fillStyle = '#DEB887'
       for (let i = 0; i < 50; i++) {
-        const x = Math.random() * CANVAS_WIDTH
-        const y = CANVAS_HEIGHT * 0.7 + Math.random() * CANVAS_HEIGHT * 0.3
+        const x = Math.random() * BASE_WIDTH
+        const y = BASE_HEIGHT * 0.7 + Math.random() * BASE_HEIGHT * 0.3
         ctx.beginPath()
         ctx.arc(x, y, 1, 0, Math.PI * 2)
         ctx.fill()
@@ -273,11 +305,11 @@ export default function FlappyBirdGame() {
         }
 
         // Draw cactus bottom part
-        ctx.fillRect(pipe.x + pipe.width * 0.2, pipe.gapY + pipe.gapHeight, pipe.width * 0.6, CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight)
+        ctx.fillRect(pipe.x + pipe.width * 0.2, pipe.gapY + pipe.gapHeight, pipe.width * 0.6, BASE_HEIGHT - pipe.gapY - pipe.gapHeight)
 
         // Cactus arms (bottom)
-        if (CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight > 100) {
-          const bottomHeight = CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight
+        if (BASE_HEIGHT - pipe.gapY - pipe.gapHeight > 100) {
+          const bottomHeight = BASE_HEIGHT - pipe.gapY - pipe.gapHeight
           ctx.fillRect(pipe.x, pipe.gapY + pipe.gapHeight + bottomHeight * 0.2, pipe.width * 0.3, pipe.width * 0.2)
           ctx.fillRect(pipe.x + pipe.width * 0.7, pipe.gapY + pipe.gapHeight + bottomHeight * 0.5, pipe.width * 0.3, pipe.width * 0.2)
         }
@@ -298,7 +330,7 @@ export default function FlappyBirdGame() {
           // Bottom cactus spines
           ctx.beginPath()
           ctx.moveTo(spineX, pipe.gapY + pipe.gapHeight + 10)
-          ctx.lineTo(spineX, CANVAS_HEIGHT - 10)
+          ctx.lineTo(spineX, BASE_HEIGHT - 10)
           ctx.stroke()
         }
 
@@ -306,7 +338,7 @@ export default function FlappyBirdGame() {
         ctx.strokeStyle = '#006400'
         ctx.lineWidth = 2
         ctx.strokeRect(pipe.x + pipe.width * 0.2, 0, pipe.width * 0.6, pipe.gapY)
-        ctx.strokeRect(pipe.x + pipe.width * 0.2, pipe.gapY + pipe.gapHeight, pipe.width * 0.6, CANVAS_HEIGHT - pipe.gapY - pipe.gapHeight)
+        ctx.strokeRect(pipe.x + pipe.width * 0.2, pipe.gapY + pipe.gapHeight, pipe.width * 0.6, BASE_HEIGHT - pipe.gapY - pipe.gapHeight)
       })
 
       // Draw volleyball - only if not exploded
@@ -406,36 +438,36 @@ export default function FlappyBirdGame() {
       }
 
       ctx.fillStyle = '#000'
-      ctx.font = 'bold 24px Arial'
+      ctx.font = `bold ${Math.max(16, 24 * scale)}px Arial`
       ctx.textAlign = 'center'
-      ctx.fillText(`Score: ${currentState.score}`, CANVAS_WIDTH / 2, 40)
+      ctx.fillText(`Score: ${currentState.score}`, BASE_WIDTH / 2, 40)
 
       if (!currentState.gameStarted && !currentState.gameOver) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT)
 
         ctx.fillStyle = '#FFF'
-        ctx.font = 'bold 32px Arial'
-        ctx.fillText('Beach Volleyball', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50)
+        ctx.font = `bold ${Math.max(20, 32 * scale)}px Arial`
+        ctx.fillText('Beach Volleyball', BASE_WIDTH / 2, BASE_HEIGHT / 2 - 50)
 
-        ctx.font = '18px Arial'
-        ctx.fillText('Tap to Bounce!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20)
+        ctx.font = `${Math.max(14, 18 * scale)}px Arial`
+        ctx.fillText('Tap to Bounce!', BASE_WIDTH / 2, BASE_HEIGHT / 2 + 20)
 
-        ctx.font = '14px Arial'
-        ctx.fillText('Desktop: Space or ↑ Arrow | Mobile: Tap', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60)
+        ctx.font = `${Math.max(10, 14 * scale)}px Arial`
+        ctx.fillText('Desktop: Space or ↑ Arrow | Mobile: Tap', BASE_WIDTH / 2, BASE_HEIGHT / 2 + 60)
       }
 
       if (currentState.gameOver) {
         ctx.fillStyle = 'rgba(255, 0, 0, 0.7)'
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT)
 
         ctx.fillStyle = '#FFF'
-        ctx.font = 'bold 32px Arial'
-        ctx.fillText('Game Over', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50)
+        ctx.font = `bold ${Math.max(20, 32 * scale)}px Arial`
+        ctx.fillText('Game Over', BASE_WIDTH / 2, BASE_HEIGHT / 2 - 50)
 
-        ctx.font = '18px Arial'
-        ctx.fillText(`Final Score: ${currentState.score}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
-        ctx.fillText('Tap to Play Again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30)
+        ctx.font = `${Math.max(14, 18 * scale)}px Arial`
+        ctx.fillText(`Final Score: ${currentState.score}`, BASE_WIDTH / 2, BASE_HEIGHT / 2)
+        ctx.fillText('Tap to Play Again', BASE_WIDTH / 2, BASE_HEIGHT / 2 + 30)
       }
 
       return currentState
@@ -481,18 +513,20 @@ export default function FlappyBirdGame() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-full p-2">
+    <div className="flex items-center justify-center min-h-screen w-full p-1 sm:p-2">
       <canvas
         ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        className="border-2 border-white rounded-lg shadow-2xl cursor-pointer select-none"
+        width={BASE_WIDTH}
+        height={BASE_HEIGHT}
+        className="border border-white sm:border-2 rounded-md sm:rounded-lg shadow-xl sm:shadow-2xl cursor-pointer select-none"
         onTouchStart={handleTouch}
         onClick={handleClick}
         style={{
           touchAction: 'none',
+          width: `${canvasSize.width}px`,
+          height: `${canvasSize.height}px`,
           maxWidth: '100vw',
-          maxHeight: '100vh'
+          maxHeight: 'calc(100vh - 20px)'
         }}
       />
     </div>
